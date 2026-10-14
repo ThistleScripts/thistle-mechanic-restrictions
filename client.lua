@@ -139,6 +139,13 @@ end
 
 local function isVehicleAllowed(mechanic, vehicleType)
 
+    -- Override set to "both": any car, bike or both mechanic
+    if vehicleType == "both" then
+        return mechanic.type == "car"
+            or mechanic.type == "bike"
+            or mechanic.type == "both"
+    end
+
     if mechanic.type == "both" then
         return vehicleType == "car" or vehicleType == "bike"
     end

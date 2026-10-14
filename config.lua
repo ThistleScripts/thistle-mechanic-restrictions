@@ -5,15 +5,19 @@ Config.VehicleSearchDistance = 8.0
 
 -----------------------------------------------------------
 -- VEHICLE TYPE OVERRIDES
--- Force a vehicle model to count as "car", "bike" or "other",
--- whatever its GTA class says. Use the spawn name.
+-- Use the vehicle's spawn name. Ignores its GTA class.
+--
+-- "bike"  = bike + both mechanics only (blocked at car mechanics)
+-- "both"  = car, bike and both mechanics
+-- "car"   = car + both mechanics only (blocked at bike mechanics)
+-- "other" = blocked everywhere
 -----------------------------------------------------------
 
 Config.VehicleTypeOverrides = {
-    -- blazer = "bike",   -- quad bike, class Off-road by default
+    -- blazer = "bike",   -- quad bike: bike mechanics only
     -- blazer2 = "bike",
     -- blazer3 = "bike",
-    -- blazer4 = "bike",
+    -- blazer4 = "both",  -- car or bike mechanics
 }
 
 -----------------------------------------------------------
