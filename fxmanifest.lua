@@ -5,7 +5,7 @@ lua54 'yes'
 
 author 'Thistle Scripts'
 description 'Vehicle type restrictions for JG Mechanic'
-version '1.0.0'
+version '1.1.0'
 
 client_scripts {
     'config.lua',

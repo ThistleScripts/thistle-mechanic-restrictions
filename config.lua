@@ -3,10 +3,40 @@ Config = {}
 Config.CheckInterval = 250
 Config.VehicleSearchDistance = 8.0
 
+-----------------------------------------------------------
+-- VEHICLE TYPE OVERRIDES
+-- Force a vehicle model to count as "car", "bike" or "other",
+-- whatever its GTA class says. Use the spawn name.
+-----------------------------------------------------------
+
+Config.VehicleTypeOverrides = {
+    -- blazer = "bike",   -- quad bike, class Off-road by default
+    -- blazer2 = "bike",
+    -- blazer3 = "bike",
+    -- blazer4 = "bike",
+}
+
+-----------------------------------------------------------
+-- RESTRICTION MESSAGES
+-- A mechanic can also set its own message = "..."
+-----------------------------------------------------------
+
+Config.Messages = {
+    car = "This mechanic only services cars.",
+    bike = "This mechanic only services motorcycles.",
+    default = "This mechanic cannot service this vehicle.",
+}
+
+-----------------------------------------------------------
+-- MECHANICS
+-- type: "car", "bike" or "both"
+-- size: zone diameter in metres (radius is size / 2)
+-----------------------------------------------------------
+
 Config.Mechanics = {
 
     -- Blacklist Customs - CARS ONLY
-    BlacklitsCustoms = {
+    BlacklistCustoms = {
         type = "car",
 
         locations = {
@@ -74,18 +104,18 @@ Config.Mechanics = {
         type = "bike",
 
         locations = {
-        {
-            coords = vector3(866.41, -2416.85, 26.84),
-            size = 4.0,
-        },
-        {
-            coords = vector3(866.78, -2408.47, 26.68),
-            size = 4.0,
-        },
-        {
-            coords = vector3(867.13, -2399.28, 26.67),
-            size = 4.0,
-        },
+            {
+                coords = vector3(866.41, -2416.85, 26.84),
+                size = 4.0,
+            },
+            {
+                coords = vector3(866.78, -2408.47, 26.68),
+                size = 4.0,
+            },
+            {
+                coords = vector3(867.13, -2399.28, 26.67),
+                size = 4.0,
+            },
         }
     },
 

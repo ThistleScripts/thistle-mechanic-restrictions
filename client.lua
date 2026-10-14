@@ -1,5 +1,14 @@
-local notificationShown = false
-local currentRestriction = nil
+local restriction = nil
+local typeOverrides = {}
+
+-----------------------------------------------------------
+-- BUILD VEHICLE TYPE OVERRIDES
+-- Model names are hashed once at startup
+-----------------------------------------------------------
+
+for model, vehicleType in pairs(Config.VehicleTypeOverrides or {}) do
+    typeOverrides[joaat(model)] = vehicleType
+end
 
 -----------------------------------------------------------
 -- NOTIFICATION
@@ -9,13 +18,18 @@ local function notify(message)
 
     -- Use ox_lib if available
     if GetResourceState("ox_lib") == "started" then
-        exports.ox_lib:notify({
-            title = "Mechanic",
-            description = message,
-            type = "error"
-        })
 
-        return
+        local ok = pcall(function()
+            exports.ox_lib:notify({
+                title = "Mechanic",
+                description = message,
+                type = "error"
+            })
+        end)
+
+        if ok then
+            return
+        end
     end
 
     -- Fallback to GTA notification
@@ -25,35 +39,18 @@ local function notify(message)
 end
 
 -----------------------------------------------------------
--- CHECK IF PLAYER IS INSIDE MECHANIC LOCATION
------------------------------------------------------------
-
-local function isInsideLocation(coords, location)
-
-    local distance = #(coords - location.coords)
-
-    return distance <= (location.size / 2)
-end
-
------------------------------------------------------------
 -- FIND CURRENT MECHANIC
+-- size is the zone's diameter, so the radius is size / 2
 -----------------------------------------------------------
 
-local function getCurrentMechanic()
-
-    local ped = PlayerPedId()
-    local coords = GetEntityCoords(ped)
+local function getCurrentMechanic(coords)
 
     for mechanicId, mechanic in pairs(Config.Mechanics) do
 
-        if mechanic.locations then
+        for _, location in ipairs(mechanic.locations or {}) do
 
-            for _, location in ipairs(mechanic.locations) do
-
-                if isInsideLocation(coords, location) then
-                    return mechanicId, mechanic
-                end
-
+            if #(coords - location.coords) <= (location.size / 2) then
+                return mechanicId, mechanic
             end
 
         end
@@ -64,97 +61,28 @@ local function getCurrentMechanic()
 end
 
 -----------------------------------------------------------
--- GET VEHICLES NEAR PLAYER
+-- GET VEHICLE
+-- The vehicle the player is in, otherwise the closest one
 -----------------------------------------------------------
 
-local function getVehiclesNearby()
+local function getVehicle(ped, coords)
 
-    local ped = PlayerPedId()
-    local playerCoords = GetEntityCoords(ped)
+    local current = GetVehiclePedIsIn(ped, false)
 
-    local vehicles = {}
-
-    -------------------------------------------------------
-    -- VEHICLE PLAYER IS CURRENTLY IN
-    -------------------------------------------------------
-
-    if IsPedInAnyVehicle(ped, false) then
-
-        local vehicle = GetVehiclePedIsIn(ped, false)
-
-        if vehicle ~= 0 and DoesEntityExist(vehicle) then
-            vehicles[#vehicles + 1] = vehicle
-        end
-
-        return vehicles
+    if current ~= 0 then
+        return current
     end
-
-    -------------------------------------------------------
-    -- FIND NEARBY VEHICLES
-    -------------------------------------------------------
-
-    local handle, vehicle = FindFirstVehicle()
-
-    if handle == -1 then
-        return vehicles
-    end
-
-    local success = true
-
-    while success do
-
-        if vehicle ~= 0 and DoesEntityExist(vehicle) then
-
-            local vehicleCoords = GetEntityCoords(vehicle)
-            local distance = #(playerCoords - vehicleCoords)
-
-            if distance <= Config.VehicleSearchDistance then
-                vehicles[#vehicles + 1] = vehicle
-            end
-
-        end
-
-        success, vehicle = FindNextVehicle(handle)
-
-    end
-
-    EndFindVehicle(handle)
-
-    return vehicles
-end
-
------------------------------------------------------------
--- GET CLOSEST VEHICLE
------------------------------------------------------------
-
-local function getNearbyVehicle()
-
-    local vehicles = getVehiclesNearby()
-
-    if #vehicles == 0 then
-        return nil
-    end
-
-    local ped = PlayerPedId()
-    local playerCoords = GetEntityCoords(ped)
 
     local closestVehicle = nil
-    local closestDistance = math.huge
+    local closestDistance = Config.VehicleSearchDistance
 
-    for _, vehicle in ipairs(vehicles) do
+    for _, vehicle in ipairs(GetGamePool("CVehicle")) do
 
-        if DoesEntityExist(vehicle) then
+        local distance = #(coords - GetEntityCoords(vehicle))
 
-            local vehicleCoords = GetEntityCoords(vehicle)
-            local distance = #(playerCoords - vehicleCoords)
-
-            if distance < closestDistance then
-
-                closestDistance = distance
-                closestVehicle = vehicle
-
-            end
-
+        if distance <= closestDistance then
+            closestDistance = distance
+            closestVehicle = vehicle
         end
 
     end
@@ -166,57 +94,39 @@ end
 -- GET VEHICLE TYPE
 -----------------------------------------------------------
 
+-- GTA vehicle classes treated as cars
+-- 8 = Motorcycles, 13 = Cycles, 14 = Boats, 15 = Helicopters,
+-- 16 = Planes, 21 = Trains are not cars
+local carClasses = {
+    [0] = true, [1] = true, [2] = true, [3] = true,
+    [4] = true, [5] = true, [6] = true, [7] = true,
+    [9] = true, [10] = true, [11] = true, [12] = true,
+    [17] = true, [18] = true, [19] = true, [20] = true,
+}
+
 local function getVehicleType(vehicle)
 
-    if not vehicle or vehicle == 0 then
-        return "other"
+    -------------------------------------------------------
+    -- CONFIG OVERRIDE
+    -------------------------------------------------------
+
+    local override = typeOverrides[GetEntityModel(vehicle)]
+
+    if override then
+        return override
     end
 
-    if not DoesEntityExist(vehicle) then
-        return "other"
-    end
+    -------------------------------------------------------
+    -- VEHICLE CLASS
+    -------------------------------------------------------
 
     local vehicleClass = GetVehicleClass(vehicle)
-
-    -------------------------------------------------------
-    -- MOTORCYCLES
-    -- GTA VEHICLE CLASS 8
-    -------------------------------------------------------
 
     if vehicleClass == 8 then
         return "bike"
     end
 
-    -------------------------------------------------------
-    -- BICYCLES
-    -- GTA VEHICLE CLASS 13
-    -------------------------------------------------------
-
-    if vehicleClass == 13 then
-        return "other"
-    end
-
-    -------------------------------------------------------
-    -- CARS / ROAD VEHICLES
-    -------------------------------------------------------
-
-    if vehicleClass == 0
-        or vehicleClass == 1
-        or vehicleClass == 2
-        or vehicleClass == 3
-        or vehicleClass == 4
-        or vehicleClass == 5
-        or vehicleClass == 6
-        or vehicleClass == 7
-        or vehicleClass == 9
-        or vehicleClass == 10
-        or vehicleClass == 11
-        or vehicleClass == 12
-        or vehicleClass == 17
-        or vehicleClass == 18
-        or vehicleClass == 19
-        or vehicleClass == 20 then
-
+    if carClasses[vehicleClass] then
         return "car"
     end
 
@@ -227,54 +137,17 @@ end
 -- CHECK IF VEHICLE IS ALLOWED
 -----------------------------------------------------------
 
-local function isVehicleAllowed(mechanic, vehicle)
-
-    if not mechanic then
-        return true
-    end
-
-    if not vehicle then
-        return true
-    end
-
-    local vehicleType = getVehicleType(vehicle)
-
-    -------------------------------------------------------
-    -- BOTH
-    -- Allows CARS + MOTORCYCLES
-    -------------------------------------------------------
+local function isVehicleAllowed(mechanic, vehicleType)
 
     if mechanic.type == "both" then
-
-        if vehicleType == "car" or vehicleType == "bike" then
-            return true
-        end
-
-        return false
+        return vehicleType == "car" or vehicleType == "bike"
     end
 
-    -------------------------------------------------------
-    -- CAR ONLY
-    -------------------------------------------------------
-
-    if mechanic.type == "car" then
-
-        return vehicleType == "car"
+    if mechanic.type == "car" or mechanic.type == "bike" then
+        return vehicleType == mechanic.type
     end
 
-    -------------------------------------------------------
-    -- MOTORCYCLE ONLY
-    -------------------------------------------------------
-
-    if mechanic.type == "bike" then
-
-        return vehicleType == "bike"
-    end
-
-    -------------------------------------------------------
-    -- UNKNOWN TYPE
-    -------------------------------------------------------
-
+    -- Unknown mechanic type
     return true
 end
 
@@ -284,129 +157,83 @@ end
 
 local function getRestrictionMessage(mechanic)
 
-    if mechanic.type == "bike" then
-        return "This mechanic only services motorcycles."
-    end
-
-    if mechanic.type == "car" then
-        return "This mechanic only services cars."
-    end
-
-    return "This mechanic cannot service this vehicle."
-end
-
------------------------------------------------------------
--- RESET RESTRICTION
------------------------------------------------------------
-
-local function resetRestriction()
-
-    currentRestriction = nil
-    notificationShown = false
+    return mechanic.message
+        or Config.Messages[mechanic.type]
+        or Config.Messages.default
 end
 
 -----------------------------------------------------------
 -- MAIN RESTRICTION LOOP
+-- Runs every Config.CheckInterval ms
 -----------------------------------------------------------
 
 CreateThread(function()
 
     while true do
 
-        local sleep = Config.CheckInterval
+        local ped = PlayerPedId()
+        local coords = GetEntityCoords(ped)
 
-        ---------------------------------------------------
-        -- FIND CURRENT MECHANIC
-        ---------------------------------------------------
-
-        local mechanicId, mechanic = getCurrentMechanic()
+        local newRestriction = nil
+        local mechanicId, mechanic = getCurrentMechanic(coords)
 
         if mechanic then
 
-            ------------------------------------------------
-            -- FIND VEHICLE
-            ------------------------------------------------
+            local vehicle = getVehicle(ped, coords)
 
-            local vehicle = getNearbyVehicle()
+            if vehicle and not isVehicleAllowed(mechanic, getVehicleType(vehicle)) then
 
-            if vehicle then
-
-                ------------------------------------------------
-                -- CHECK VEHICLE TYPE
-                ------------------------------------------------
-
-                local allowed = isVehicleAllowed(
-                    mechanic,
-                    vehicle
-                )
+                newRestriction = {
+                    mechanic = mechanicId,
+                    vehicle = vehicle,
+                }
 
                 ------------------------------------------------
-                -- WRONG VEHICLE
+                -- NOTIFY ONCE PER MECHANIC + VEHICLE
                 ------------------------------------------------
 
-                if not allowed then
+                if not restriction
+                    or restriction.mechanic ~= mechanicId
+                    or restriction.vehicle ~= vehicle then
 
-                    currentRestriction = {
-                        mechanic = mechanicId,
-                        vehicle = vehicle,
-                        type = mechanic.type
-                    }
-
-                    ------------------------------------------------
-                    -- BLOCK E / INPUT_CONTEXT
-                    ------------------------------------------------
-
-                    DisableControlAction(0, 38, true)
-                    DisableControlAction(1, 38, true)
-                    DisableControlAction(2, 38, true)
-
-                    ------------------------------------------------
-                    -- SHOW ONLY ONCE
-                    ------------------------------------------------
-
-                    if not notificationShown then
-
-                        notify(
-                            getRestrictionMessage(mechanic)
-                        )
-
-                        notificationShown = true
-
-                    end
-
-                    sleep = 0
-
-                else
-
-                    ------------------------------------------------
-                    -- CORRECT VEHICLE
-                    ------------------------------------------------
-
-                    resetRestriction()
-
+                    notify(getRestrictionMessage(mechanic))
                 end
-
-            else
-
-                ------------------------------------------------
-                -- NO VEHICLE
-                ------------------------------------------------
-
-                resetRestriction()
 
             end
 
-        else
-
-            ---------------------------------------------------
-            -- OUTSIDE MECHANIC
-            ---------------------------------------------------
-
-            resetRestriction()
-
         end
 
-        Wait(sleep)
+        restriction = newRestriction
+
+        Wait(Config.CheckInterval)
+
+    end
+
+end)
+
+-----------------------------------------------------------
+-- INPUT BLOCK LOOP
+-- Only runs every frame while a restriction is active
+-----------------------------------------------------------
+
+CreateThread(function()
+
+    while true do
+
+        if restriction then
+
+            -- Block E / INPUT_CONTEXT
+            DisableControlAction(0, 38, true)
+            DisableControlAction(1, 38, true)
+            DisableControlAction(2, 38, true)
+
+            Wait(0)
+
+        else
+
+            Wait(Config.CheckInterval)
+
+        end
 
     end
 
