@@ -14,10 +14,16 @@ Config.VehicleSearchDistance = 8.0
 -----------------------------------------------------------
 
 Config.VehicleTypeOverrides = {
-    -- blazer = "bike",   -- quad bike: bike mechanics only
-    -- blazer2 = "bike",
-    -- blazer3 = "bike",
-    -- blazer4 = "both",  -- car or bike mechanics
+    blazer = "bike",
+    blazer2 = "bike",
+    blazer3 = "bike",
+    blazer4 = "bike",
+    blazer5 = "bike",
+    dune = "bike",
+    dune3 = "bike",
+    outlaw = "bike",
+    vagrant = "bike",
+    verus = "bike",
 }
 
 -----------------------------------------------------------
